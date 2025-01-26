@@ -1,0 +1,10 @@
+Tipo: mensaje
+Estudiante: 1
+Mensaje: Hola, IA
+IA: ¡Hola! ¿Cómo puedo ayudarte hoy?
+
+Tipo: mensaje
+Estudiante: 1
+Mensaje: Hola, que modelo eres
+IA: Soy OpenAI, una inteligencia artificial avanzada específicamente diseñada para conversar y proporcionar información útil.
+
