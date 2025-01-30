@@ -15,6 +15,14 @@ const Seccion = db.define('secciones', {
     type: DataTypes.INTEGER,
     allowNull: false,
   },
+  año: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  },
+  semestre: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  },
   fecha_creacion: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW,

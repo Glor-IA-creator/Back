@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import db from './database/db.js';
 import 'dotenv/config';
-import { Usuario, Seccion, EstudiantesSecciones } from './models/index.js'; // Modelos
+import { Usuario, Seccion, EstudiantesSecciones, Thread } from './models/index.js'; // Asegurar que se exporta
 import estudiantesRoutes from './routes/estudiantesRoutes.js';
 import usuarioRoutes from './routes/usuarioRoutes.js';
 import seccionRoutes from './routes/seccionRoutes.js';
