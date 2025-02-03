@@ -3,9 +3,9 @@ import Seccion from '../models/Seccion.js';
 import Thread from '../models/Thread.js';
 import EstudiantesSecciones from '../models/EstudiantesSecciones.js';
 
-// 🔹 Asignar un estudiante a una sección
+// Asignar un estudiante a una sección
 export const asignarEstudiante = async (req, res) => {
-  const { id } = req.params; // ID de la sección
+  const { id } = req.params;
   const { id_estudiante } = req.body;
 
   try {
@@ -15,14 +15,13 @@ export const asignarEstudiante = async (req, res) => {
     });
     res.status(201).json(asignacion);
   } catch (error) {
-    console.error('Error al asignar estudiante:', error);
     res.status(500).json({ message: 'Error al asignar estudiante', error });
   }
 };
 
-// 🔹 Obtener estudiantes de una sección
+// Obtener estudiantes de una sección
 export const obtenerEstudiantes = async (req, res) => {
-  const { id } = req.params; // ID de la sección
+  const { id } = req.params;
 
   try {
     const seccion = await Seccion.findByPk(id, {
@@ -30,7 +29,7 @@ export const obtenerEstudiantes = async (req, res) => {
         model: Usuario,
         as: 'usuarios',
         through: { attributes: [] },
-        where: { id_rol: 3 }, // Filtra solo estudiantes (rol 3)
+        where: { id_rol: 3 },
         attributes: ['id_usuario', 'nombre', 'email'],
       },
     });
@@ -41,12 +40,11 @@ export const obtenerEstudiantes = async (req, res) => {
 
     res.status(200).json(seccion.usuarios);
   } catch (error) {
-    console.error('Error al obtener estudiantes:', error);
     res.status(500).json({ message: 'Error al obtener estudiantes', error });
   }
 };
 
-// 🔹 Eliminar un estudiante de una sección
+// Eliminar un estudiante de una sección
 export const eliminarEstudiante = async (req, res) => {
   const { id, id_estudiante } = req.params;
 
@@ -56,12 +54,11 @@ export const eliminarEstudiante = async (req, res) => {
     });
     res.status(200).json({ message: 'Estudiante eliminado de la sección' });
   } catch (error) {
-    console.error('Error al eliminar estudiante:', error);
     res.status(500).json({ message: 'Error al eliminar estudiante', error });
   }
 };
 
-// 🔹 Obtener todas las secciones a las que pertenece un estudiante
+// Obtener todas las secciones a las que pertenece un estudiante
 export const obtenerSeccionesPorEstudiante = async (req, res) => {
   const { id_estudiante } = req.params;
 
@@ -71,7 +68,7 @@ export const obtenerSeccionesPorEstudiante = async (req, res) => {
         model: Seccion,
         as: 'secciones',
         through: { attributes: [] },
-        attributes: ['id_seccion', 'nombre', 'año', 'semestre'], // Secciones con año y semestre
+        attributes: ['id_seccion', 'nombre', 'año', 'semestre'],
       },
     });
 
@@ -81,23 +78,29 @@ export const obtenerSeccionesPorEstudiante = async (req, res) => {
 
     res.status(200).json(estudiante.secciones);
   } catch (error) {
-    console.error('Error al obtener secciones del estudiante:', error);
     res.status(500).json({ message: 'Error al obtener secciones del estudiante', error });
   }
 };
 
-// 🔹 Obtener lista de estudiantes con sus estadísticas (N° Sesiones, N° Pacientes)
+// Obtener lista de estudiantes con sus estadísticas (N° Sesiones, N° Pacientes)
 export const obtenerListaEstudiantes = async (req, res) => {
   try {
+    const { year, section } = req.query;
+
+    const whereSeccion = {};
+    if (year) whereSeccion.año = year;
+    if (section) whereSeccion.nombre = section;
+
     const estudiantes = await Usuario.findAll({
-      where: { id_rol: 3 }, // Solo estudiantes
+      where: { id_rol: 3 },
       attributes: ['id_usuario', 'nombre', 'email'],
       include: [
         {
           model: Seccion,
-          as: 'seccionesEstudiante', // 🔹 Cambio aquí
+          as: 'seccionesEstudiante',
           through: { attributes: [] },
           attributes: ['id_seccion', 'nombre', 'año', 'semestre'],
+          where: Object.keys(whereSeccion).length ? whereSeccion : undefined,
         },
         {
           model: Thread,
@@ -107,18 +110,16 @@ export const obtenerListaEstudiantes = async (req, res) => {
       ],
     });
 
-    // Procesar los datos
     const estudiantesProcesados = estudiantes.map((estudiante) => {
-      const threads = estudiante.threads || [];
-      const totalSesiones = threads.length;
-      const asistentesUnicos = new Set(threads.map((t) => t.id_asistente)).size;
+      const totalSesiones = estudiante.threads.length;
+      const pacientesUnicos = new Set(estudiante.threads.map((t) => t.id_asistente)).size;
 
       return {
         id_usuario: estudiante.id_usuario,
         nombre: estudiante.nombre,
         email: estudiante.email,
         sesiones: totalSesiones,
-        pacientes: asistentesUnicos,
+        pacientes: pacientesUnicos,
         secciones: estudiante.seccionesEstudiante.map((s) => ({
           nombre: s.nombre,
           año: s.año,
@@ -129,13 +130,11 @@ export const obtenerListaEstudiantes = async (req, res) => {
 
     res.status(200).json(estudiantesProcesados);
   } catch (error) {
-    console.error('Error al obtener la lista de estudiantes:', error);
     res.status(500).json({ message: 'Error al obtener estudiantes', error });
   }
 };
 
-
-// 🔹 Obtener detalles de un estudiante por ID
+// Obtener detalles de un estudiante por ID
 export const obtenerEstudiantePorId = async (req, res) => {
   const { id_estudiante } = req.params;
 
@@ -180,12 +179,11 @@ export const obtenerEstudiantePorId = async (req, res) => {
         : null,
     });
   } catch (error) {
-    console.error('Error al obtener detalles del estudiante:', error);
     res.status(500).json({ message: 'Error al obtener detalles del estudiante', error });
   }
 };
 
-// 🔹 Obtener estudiantes de una sección específica
+// Obtener estudiantes de una sección específica
 export const obtenerEstudiantesPorSeccion = async (req, res) => {
   const { id_seccion } = req.params;
 
@@ -203,7 +201,6 @@ export const obtenerEstudiantesPorSeccion = async (req, res) => {
 
     res.status(200).json(estudiantes);
   } catch (error) {
-    console.error('Error al obtener estudiantes de la sección:', error);
     res.status(500).json({ message: 'Error al obtener estudiantes de la sección', error });
   }
 };
