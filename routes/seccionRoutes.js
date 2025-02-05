@@ -19,22 +19,22 @@ const router = express.Router();
  */
 
 // Crear una nueva sección (solo profesores)
-router.post('/', validarJWT, verificarRol(['profesor']), crearSeccion);
+router.post('/', validarJWT, verificarRol(['profesor', 'admin']), crearSeccion);
 
 // Obtener todas las secciones (acceso para profesores y estudiantes)
-router.get('/', validarJWT, verificarRol(['profesor', 'estudiante']), obtenerSecciones);
+router.get('/', validarJWT, verificarRol(['profesor', 'estudiante', 'admin']), obtenerSecciones);
 
 // Obtener sección específica por ID (acceso para profesores y estudiantes)
-router.get('/:id', validarJWT, verificarRol(['profesor', 'estudiante']), obtenerSeccionPorId);
+router.get('/:id', validarJWT, verificarRol(['profesor', 'estudiante', 'admin']), obtenerSeccionPorId);
 
 // Asignar estudiante a una sección (solo profesores)
-router.post('/:id/estudiantes', validarJWT, verificarRol(['profesor']), asignarEstudiante);
+router.post('/:id/estudiantes', validarJWT, verificarRol(['profesor', 'admin']), asignarEstudiante);
 
 // Obtener lista de estudiantes en una sección (acceso para profesores y estudiantes)
 router.get('/:id/estudiantes', validarJWT, verificarRol(['profesor', 'estudiante']), obtenerEstudiantesDeSeccion);
 
 // Eliminar estudiante de una sección (solo profesores)
-router.delete('/:id/estudiantes/:id_estudiante', validarJWT, verificarRol(['profesor']), eliminarEstudianteDeSeccion);
+router.delete('/:id/estudiantes/:id_estudiante', validarJWT, verificarRol(['profesor', 'admin']), eliminarEstudianteDeSeccion);
 
 // Obtener secciones por año (acceso para profesores y estudiantes)
 router.get('/anio/:anio', validarJWT, verificarRol(['profesor', 'estudiante']), obtenerSeccionesPorAnio);

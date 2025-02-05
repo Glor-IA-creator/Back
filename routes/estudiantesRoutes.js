@@ -3,13 +3,23 @@ import {
   asignarEstudiante,
   obtenerEstudiantes,
   eliminarEstudiante,
+  obtenerSeccionesPorEstudiante,
+  obtenerListaEstudiantes,
+  obtenerEstudiantePorId,
+  obtenerEstudiantesPorSeccion,
 } from '../controllers/estudiantesController.js';
 import { validarJWT, verificarRol } from '../middleware/auth.js';
 
 const router = express.Router();
 
-router.post('/:id/estudiantes', validarJWT, verificarRol([2]), asignarEstudiante); // Asignar estudiante
-router.get('/:id/estudiantes', validarJWT, verificarRol([2]), obtenerEstudiantes); // Obtener estudiantes
-router.delete('/:id/estudiantes/:id_estudiante', validarJWT, verificarRol([2]), eliminarEstudiante); // Eliminar estudiante
+router.post('/:id/asignar', validarJWT, verificarRol(['admin']), asignarEstudiante);
+router.get('/:id/estudiantes', validarJWT, obtenerEstudiantes);
+router.delete('/:id/eliminar/:id_estudiante', validarJWT, verificarRol(['admin']), eliminarEstudiante);
+
+// 🔹 Nuevas rutas
+router.get('/secciones/:id_estudiante', validarJWT, obtenerSeccionesPorEstudiante);
+router.get('/listado', validarJWT, obtenerListaEstudiantes);
+router.get('/:id_estudiante', validarJWT, obtenerEstudiantePorId);
+router.get('/seccion/:id_seccion', validarJWT, obtenerEstudiantesPorSeccion);
 
 export default router;
