@@ -7,6 +7,8 @@ import {
   asignarEstudiante,
   obtenerEstudiantesDeSeccion,
   eliminarEstudianteDeSeccion,
+  eliminarSeccion,
+  cambiarEstadoSeccion,
 } from '../controllers/seccionController.js';
 import { validarJWT, verificarRol } from '../middleware/auth.js';
 
@@ -17,6 +19,13 @@ const router = express.Router();
  * - 'profesor': Acceso restringido a profesores.
  * - 'estudiante': Acceso restringido a estudiantes.
  */
+
+
+// 📌 Cambiar el estado de una sección (habilitar/deshabilitar)
+router.put('/:id/estado', validarJWT, verificarRol(['admin', 'profesor']), cambiarEstadoSeccion);
+
+// Eliminar una sección (solo profesores y administradores)
+router.delete('/:id', validarJWT, verificarRol(['profesor', 'admin']), eliminarSeccion);
 
 // Crear una nueva sección (solo profesores)
 router.post('/', validarJWT, verificarRol(['profesor', 'admin']), crearSeccion);

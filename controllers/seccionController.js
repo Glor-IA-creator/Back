@@ -3,23 +3,77 @@ import { Op } from 'sequelize';
 import Usuario from '../models/Usuario.js';
 import EstudiantesSecciones from '../models/EstudiantesSecciones.js';
 
+// Cambiar el estado de una sección (habilitar/deshabilitar)
+export const cambiarEstadoSeccion = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    // Buscar la sección por ID
+    const seccion = await Seccion.findByPk(id);
+    if (!seccion) {
+      return res.status(404).json({ message: "Sección no encontrada" });
+    }
+
+    // Invertir el estado actual (enabled)
+    seccion.enabled = !seccion.enabled;
+    await seccion.save();
+
+    res.status(200).json({ message: "Estado de la sección actualizado correctamente", seccion });
+  } catch (error) {
+    console.error("Error al cambiar el estado de la sección:", error);
+    res.status(500).json({ message: "Error interno al cambiar el estado de la sección" });
+  }
+};
+
+
+// Eliminar una sección por ID
+export const eliminarSeccion = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const seccion = await Seccion.findByPk(id);
+    if (!seccion) {
+      return res.status(404).json({ message: 'Sección no encontrada' });
+    }
+
+    await seccion.destroy();
+    res.status(200).json({ message: 'Sección eliminada exitosamente' });
+  } catch (error) {
+    console.error('Error al eliminar la sección:', error);
+    res.status(500).json({ message: 'Error al eliminar la sección', error });
+  }
+};
+
+
 // Crear una nueva sección
 export const crearSeccion = async (req, res) => {
-  const { nombre } = req.body;
+  console.log("📥 Datos recibidos en el backend:", req.body); // 👀 Verifica los datos
+  console.log("👤 Usuario autenticado:", req.usuario);
 
-  if (!nombre || nombre.trim() === '') {
-    return res.status(400).json({ message: 'El nombre de la sección es obligatorio' });
+  const { nombre, año, semestre } = req.body;
+
+  if (!nombre || !año || !semestre) {
+    return res.status(400).json({ message: 'Faltan datos obligatorios' });
   }
 
   try {
-    const id_profesor = req.usuario.id; // ID del profesor autenticado
-    const nuevaSeccion = await Seccion.create({ nombre, id_profesor });
+    const id_profesor = req.usuario.id;
+    const nuevaSeccion = await Seccion.create({
+      nombre,
+      año,
+      semestre,
+      id_profesor,
+      enabled: true
+    });
+
     res.status(201).json(nuevaSeccion);
   } catch (error) {
-    console.error('Error al crear la sección:', error);
+    console.error('❌ Error al crear sección:', error);
     res.status(500).json({ message: 'Error al crear la sección', error });
   }
 };
+
+
 
 // Obtener todas las secciones
 export const obtenerSecciones = async (req, res) => {

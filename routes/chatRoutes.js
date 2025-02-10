@@ -7,6 +7,7 @@ import { obtenerMensajes } from '../controllers/chatController.js';
 import { obtenerHistorialDeHilos } from '../controllers/chatController.js';
 import { obtenerUltimoHilo } from '../controllers/chatController.js';
 import { obtenerFechasDeHilosPorUsuarioYAsistente } from '../controllers/chatController.js';
+import { registrarTiempoDeUsoChat } from '../controllers/chatController.js';
 
 
 const router = express.Router();
@@ -29,5 +30,8 @@ router.get('/obtener-fechas', validarJWT, obtenerFechasDeHilosPorUsuarioYAsisten
 router.get('/ultimo-hilo', validarJWT, obtenerUltimoHilo);
 
 router.get('/historial', validarJWT, obtenerHistorialDeHilos);
+
+
+router.post('/registrar-tiempo', validarJWT, registrarTiempoDeUsoChat);
 
 export default router;

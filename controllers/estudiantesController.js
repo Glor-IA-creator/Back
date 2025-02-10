@@ -207,3 +207,25 @@ export const obtenerEstudiantesPorSeccion = async (req, res) => {
     res.status(500).json({ message: 'Error al obtener estudiantes de la sección', error });
   }
 };
+
+// 🔹 Obtener historial de chats de un estudiante
+export const obtenerHistorialChats = async (req, res) => {
+  const { id_estudiante } = req.params;
+
+  try {
+    const chats = await Thread.findAll({
+      where: { id_usuario: id_estudiante },
+      attributes: ['id_thread', 'id_asistente', 'fecha_creacion'], // ✅ Cambio de 'fecha' a 'fecha_creacion'
+      order: [['fecha_creacion', 'DESC']],
+    });
+
+    if (!chats.length) {
+      return res.status(404).json({ message: 'No hay historial de chats para este estudiante.' });
+    }
+
+    res.status(200).json(chats);
+  } catch (error) {
+    console.error('❌ Error al obtener historial de chats:', error);
+    res.status(500).json({ message: 'Error al obtener historial de chats', error });
+  }
+};
