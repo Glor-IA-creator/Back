@@ -4,6 +4,7 @@ import {
   crearUsuario,
   iniciarSesion,
   obtenerUsuarioActual,
+  
 } from '../controllers/usuarioController.js';
 import { validarJWT, verificarRol } from '../middleware/auth.js';
 
@@ -16,5 +17,6 @@ router.post('/login', iniciarSesion);
 router.get('/me', validarJWT, obtenerUsuarioActual);
 router.get('/', validarJWT, verificarRol(['admin']), obtenerUsuarios);
 router.post('/register', validarJWT, verificarRol(['admin']), crearUsuario);
+
 
 export default router;

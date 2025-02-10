@@ -7,6 +7,7 @@ import {
   obtenerListaEstudiantes,
   obtenerEstudiantePorId,
   obtenerEstudiantesPorSeccion,
+  obtenerHistorialChats,  
 } from '../controllers/estudiantesController.js';
 import { validarJWT, verificarRol } from '../middleware/auth.js';
 
@@ -21,5 +22,7 @@ router.get('/secciones/:id_estudiante', validarJWT, obtenerSeccionesPorEstudiant
 router.get('/listado', validarJWT, obtenerListaEstudiantes);
 router.get('/:id_estudiante', validarJWT, obtenerEstudiantePorId);
 router.get('/seccion/:id_seccion', validarJWT, obtenerEstudiantesPorSeccion);
+router.get('/:id_estudiante/chats', validarJWT, obtenerHistorialChats);
+
 
 export default router;

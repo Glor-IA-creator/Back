@@ -272,6 +272,27 @@ export const obtenerMensajes = async (req, res) => {
     }
 };
 
+// ✅ Registrar tiempo de uso en el chat
+export const registrarTiempoDeUsoChat = async (req, res) => {
+  const { id } = req.usuario;
+  const { minutos } = req.body;
+
+  try {
+    const usuario = await Usuario.findByPk(id);
+
+    if (!usuario) {
+      return res.status(404).json({ message: 'Usuario no encontrado' });
+    }
+
+    usuario.minutos_uso += minutos;
+    await usuario.save();
+
+    res.json({ message: 'Tiempo de uso registrado', minutos });
+  } catch (error) {
+    console.error('❌ Error al registrar tiempo de uso:', error);
+    res.status(500).json({ message: 'Error al registrar el tiempo de uso', error });
+  }
+};
 
 // Obtener las fechas de los hilos del usuario con un asistente específico
 export const obtenerFechasDeHilosPorUsuarioYAsistente = async (req, res) => {
