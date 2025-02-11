@@ -86,16 +86,16 @@ export const obtenerSeccionesPorEstudiante = async (req, res) => {
   }
 };
 
-// 🔹 Obtener lista de estudiantes con sus estadísticas (N° Sesiones, N° Pacientes)
+// 🔹 Obtener lista de estudiantes con sus estadísticas (N° Sesiones, N° Pacientes, Minutos de Uso)
 export const obtenerListaEstudiantes = async (req, res) => {
   try {
     const estudiantes = await Usuario.findAll({
       where: { id_rol: 3 }, // Solo estudiantes
-      attributes: ['id_usuario', 'nombre', 'email'],
+      attributes: ['id_usuario', 'nombre', 'email', 'minutos_uso'], // ✅ Agregar minutos de uso
       include: [
         {
           model: Seccion,
-          as: 'seccionesEstudiante', // 🔹 Cambio aquí
+          as: 'seccionesEstudiante',
           through: { attributes: [] },
           attributes: ['id_seccion', 'nombre', 'año', 'semestre'],
         },
@@ -119,6 +119,7 @@ export const obtenerListaEstudiantes = async (req, res) => {
         email: estudiante.email,
         sesiones: totalSesiones,
         pacientes: asistentesUnicos,
+        minutos_uso: estudiante.minutos_uso || 0, // ✅ Asegurar que siempre haya un valor
         secciones: estudiante.seccionesEstudiante.map((s) => ({
           nombre: s.nombre,
           año: s.año,

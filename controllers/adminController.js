@@ -1,14 +1,14 @@
 import { Usuario, Seccion, Thread, Rol } from '../models/index.js';
 import { Op } from 'sequelize';
 
-// 🔹 Obtener estudiantes y docentes con estado 'enabled', rol e interacciones
+// 🔹 Obtener estudiantes y docentes con estado 'enabled', rol, minutos de uso e interacciones
 export const obtenerEstudiantesAdmin = async (req, res) => {
   console.log("🟢 Se recibió una solicitud para obtener estudiantes y docentes");
 
   try {
     const estudiantes = await Usuario.findAll({
       where: { id_rol: { [Op.in]: [2, 3] } }, // 🔹 Buscar id_rol 2 y 3 (Docentes y Estudiantes)
-      attributes: ['id_usuario', 'nombre', 'email', 'enabled', 'id_rol'],
+      attributes: ['id_usuario', 'nombre', 'email', 'enabled', 'id_rol', 'minutos_uso'], // ✅ Agregar minutos_uso
       include: [
         {
           model: Seccion,
@@ -48,6 +48,7 @@ export const obtenerEstudiantesAdmin = async (req, res) => {
         rol: rolesMap[estudiante.id_rol] || 'Sin Rol',
         sesiones: totalSesiones,
         pacientes: asistentesUnicos,
+        minutos_uso: estudiante.minutos_uso || 0, // ✅ Ahora se incluyen los minutos de uso
         secciones: estudiante.seccionesEstudiante.map((s) => ({
           nombre: s.nombre,
           año: s.año,
