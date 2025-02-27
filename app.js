@@ -27,6 +27,8 @@ app.use('/api/admin', (req, res, next) => {
 
 // Rutas públicas
 app.use('/api/usuarios', usuarioRoutes);
+app.use('/api/hilos', chatRoutes);
+
 
 (async () => {
   try {

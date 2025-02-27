@@ -384,4 +384,55 @@ export const obtenerUltimoHilo = async (req, res) => {
       });
     }
   };
+
+
+  export const obtenerUltimoHiloPorAsistente = async (req, res) => {
+    const userId = req.usuario.id;
+    const { assistantId } = req.query; // Recibir el ID del asistente como parámetro
+
+    if (!assistantId) {
+        return res.status(400).json({ message: 'El ID del asistente es obligatorio.' });
+    }
+
+    try {
+        // Buscar el último hilo modificado por el usuario y el asistente específico
+        const ultimoHilo = await Thread.findOne({
+            where: { 
+                id_usuario: userId,
+                id_asistente: assistantId,
+            },
+            order: [['updatedAt', 'DESC']], // Ordenar por última actualización
+        });
+
+        if (!ultimoHilo) {
+            return res.status(404).json({ message: 'No se encontraron hilos para este usuario con este asistente.' });
+        }
+
+        const { id_thread: threadId, enabled } = ultimoHilo;
+
+        // Buscar los detalles del asistente
+        const assistant = assistants.find((asst) => asst.id === assistantId);
+
+        if (!assistant) {
+            return res.status(404).json({ message: 'El asistente asociado al hilo no existe.' });
+        }
+
+        // Responder con los datos del hilo y el asistente
+        res.json({
+            threadId,
+            patientId: assistant.id, // ID del asistente
+            name: assistant.name,
+            image: assistant.image,
+            description: assistant.description,
+            enabled,
+        });
+    } catch (error) {
+        console.error('Error al obtener el último hilo del asistente:', error.message);
+        res.status(500).json({
+            message: 'Error al obtener el último hilo del asistente.',
+            detalles: error.message,
+        });
+    }
+};
+
   
