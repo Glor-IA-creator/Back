@@ -8,6 +8,7 @@ import { obtenerHistorialDeHilos } from '../controllers/chatController.js';
 import { obtenerUltimoHilo } from '../controllers/chatController.js';
 import { obtenerFechasDeHilosPorUsuarioYAsistente } from '../controllers/chatController.js';
 import { registrarTiempoDeUsoChat } from '../controllers/chatController.js';
+import { obtenerUltimoHiloPorAsistente } from '../controllers/chatController.js';
 
 
 const router = express.Router();
@@ -33,5 +34,11 @@ router.get('/historial', validarJWT, obtenerHistorialDeHilos);
 
 
 router.post('/registrar-tiempo', validarJWT, registrarTiempoDeUsoChat);
+
+
+// Ruta para obtener el último hilo según el asistente
+router.get('/ultimo-hilo-asistente', validarJWT, obtenerUltimoHiloPorAsistente);
+
+
 
 export default router;
