@@ -15,13 +15,13 @@ const openai = new OpenAI({
 
 // Lista de asistentes disponibles
 const assistants = [
-    { id: 'asst_Xx06oeSiJnLTHeK2fJHcbxzF', name: 'Matías Ríos', image: 'https://res.cloudinary.com/df5lekmb6/image/upload/v1736740997/MATIAS_dsytw0.png', description: 'Psicólogo clínico con enfoque en ansiedad.' },
-    { id: 'asst_rT3d64PKjIP2YCJzQLIKD9zD', name: 'Gloria', image: 'https://res.cloudinary.com/df5lekmb6/image/upload/v1736740996/GLORIA_amy2us.png', description: 'Especialista en terapias cognitivo-conductuales.' },
-    { id: 'asst_gUECq24wTRwPkmitA18WOChZ', name: 'Alejandro López', image: 'https://res.cloudinary.com/df5lekmb6/image/upload/v1736740997/Alejandro_thwmpj.png', description: 'Terapeuta especializado en adolescentes.' },
-    { id: 'asst_B3TfdniT0pSxTOYRtrvC9lvC', name: 'Luis Fernández', image: 'https://res.cloudinary.com/df5lekmb6/image/upload/v1736740996/Luis_bpguzg.png', description: 'Especialista en psicoterapia humanista.' },
-    { id: 'asst_NyQk1ZDUK5fkoQAUEKjsodTZ', name: 'Carlos Mendoza', image: 'https://res.cloudinary.com/df5lekmb6/image/upload/v1736740996/CARLOS_zjpqct.png', description: 'Especialista en terapias cognitivo-conductuales.' },
-    { id: 'asst_CVlAdD3yeSlGl3mBlDdTFIh8', name: 'José Ramírez', image: 'https://res.cloudinary.com/df5lekmb6/image/upload/v1736740997/JOSE_qkp1dj.png', description: 'Terapeuta especializado en adolescentes.' },
-    { id: 'asst_kyQLTBmPTvbIQTiSQlNtwNoH', name: 'Maria Gomez', image: 'https://res.cloudinary.com/df5lekmb6/image/upload/v1736740997/MARIA_p9onmi.png', description: 'Especialista en psicoterapia humanista.' },
+    { id: 'asst_Xx06oeSiJnLTHeK2fJHcbxzF', name: 'Matías Ríos', image: 'https://res.cloudinary.com/df5lekmb6/image/upload/v1741564021/rsptuyevsarr3mzqc5ny.png', description: 'Psicólogo clínico con enfoque en ansiedad.' },
+    { id: 'asst_rT3d64PKjIP2YCJzQLIKD9zD', name: 'Gloria', image: 'https://res.cloudinary.com/df5lekmb6/image/upload/v1741564021/cenk1mh6mk067bqc7m2t.png', description: 'Especialista en terapias cognitivo-conductuales.' },
+    { id: 'asst_gUECq24wTRwPkmitA18WOChZ', name: 'Alejandro López', image: 'https://res.cloudinary.com/df5lekmb6/image/upload/v1741564021/gxl328leuugmfywbkrlt.png', description: 'Terapeuta especializado en adolescentes.' },
+    { id: 'asst_B3TfdniT0pSxTOYRtrvC9lvC', name: 'Luis Fernández', image: 'https://res.cloudinary.com/df5lekmb6/image/upload/v1741564021/nkw8ossvdckrwjbnqxtm.png', description: 'Especialista en psicoterapia humanista.' },
+    { id: 'asst_NyQk1ZDUK5fkoQAUEKjsodTZ', name: 'Carlos Mendoza', image: 'https://res.cloudinary.com/df5lekmb6/image/upload/v1741564022/spr6gt9besefwyd57wvk.png', description: 'Especialista en terapias cognitivo-conductuales.' },
+    { id: 'asst_CVlAdD3yeSlGl3mBlDdTFIh8', name: 'José Ramírez', image: 'https://res.cloudinary.com/df5lekmb6/image/upload/v1741564021/a4jlurybskdwftw59poa.png', description: 'Terapeuta especializado en adolescentes.' },
+    { id: 'asst_kyQLTBmPTvbIQTiSQlNtwNoH', name: 'Maria Gomez', image: 'https://res.cloudinary.com/df5lekmb6/image/upload/v1741564021/su5qnrj0hgpoyuy4j3to.png', description: 'Especialista en psicoterapia humanista.' },
   ];
 
 const DEFAULT_ASSISTANT_ID = process.env.ASSISTANT_ID || assistants[0].id;
