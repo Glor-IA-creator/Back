@@ -245,32 +245,69 @@ export const ejecutarAsistente = async (req, res) => {
     }
 };
 
-// Obtener mensajes de un hilo
 export const obtenerMensajes = async (req, res) => {
-    const { threadId } = req.query;
+  const { threadId } = req.query;
 
-    if (!threadId) {
-        return res.status(400).json({
-            message: "El threadId es obligatorio.",
-        });
-    }
+  if (!threadId) {
+      return res.status(400).json({
+          message: "El threadId es obligatorio.",
+      });
+  }
 
-    try {
-        console.log(`Obteniendo mensajes para el hilo: ${threadId}`);
-        const messages = await openai.beta.threads.messages.list(threadId); // Cambia según tu implementación
-        const formattedMessages = messages.data.map((msg) => ({
-            role: msg.role,
-            content: msg.content[0]?.text?.value || "",
-        }));
-        res.json({ messages: formattedMessages });
-    } catch (error) {
-        console.error("Error al obtener los mensajes:", error.message);
-        res.status(500).json({
-            message: "Error al obtener los mensajes del hilo.",
-            detalles: error.message,
-        });
-    }
+  try {
+      // Buscar el hilo en la base de datos para obtener id_asistente e id_usuario
+      const thread = await Thread.findOne({ where: { id_thread: threadId } });
+      if (!thread) {
+          return res.status(404).json({ message: 'Hilo no encontrado.' });
+      }
+
+      // Obtener detalles del asistente a partir de la lista de asistentes
+      const assistant = assistants.find(asst => asst.id === thread.id_asistente);
+
+      // Obtener detalles del usuario a partir del modelo Usuario
+      const user = await Usuario.findByPk(thread.id_usuario);
+
+      // Obtener los mensajes del hilo desde OpenAI
+      console.log(`Obteniendo mensajes para el hilo: ${threadId}`);
+      const messages = await openai.beta.threads.messages.list(threadId);
+
+      // Reemplazar el role por el nombre correspondiente (assistant o user)
+      const formattedMessages = messages.data.map((msg) => {
+          let senderName = msg.role; // Valor por defecto
+          if (msg.role === 'assistant') {
+              senderName = assistant?.name || 'Asistente desconocido';
+          } else if (msg.role === 'user') {
+              senderName = user?.nombre || user?.name || 'Usuario desconocido';
+          }
+          return {
+              sender: senderName,
+              content: msg.content[0]?.text?.value || "",
+          };
+      });
+
+      // Responder con los mensajes, junto a la información del asistente y el usuario
+      res.json({ 
+          assistant: {
+              id: assistant?.id || null,
+              name: assistant?.name || 'Asistente desconocido'
+          },
+          user: {
+              id: user?.id || null,
+              name: user?.nombre || user?.name || 'Usuario desconocido'
+          },
+          messages: formattedMessages 
+      });
+  } catch (error) {
+      console.error("Error al obtener los mensajes:", error.message);
+      res.status(500).json({
+          message: "Error al obtener los mensajes del hilo.",
+          detalles: error.message,
+      });
+  }
 };
+
+
+
 
 // ✅ Registrar tiempo de uso en el chat
 export const registrarTiempoDeUsoChat = async (req, res) => {
