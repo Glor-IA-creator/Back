@@ -63,7 +63,7 @@ export const iniciarSesion = async (req, res) => {
     const token = jwt.sign(
       { id: usuario.id_usuario, nombre: usuario.nombre, rol: usuario.rol.nombre },
       process.env.JWT_SECRET,
-      { expiresIn: '2h' }
+      { expiresIn: '15m' }
     );
 
     console.log('🔐 Token generado:', token);
