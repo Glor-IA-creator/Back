@@ -249,63 +249,80 @@ export const obtenerMensajes = async (req, res) => {
   const { threadId } = req.query;
 
   if (!threadId) {
-      return res.status(400).json({
-          message: "El threadId es obligatorio.",
-      });
+    return res.status(400).json({
+      message: "El threadId es obligatorio.",
+    });
   }
 
   try {
-      // Buscar el hilo en la base de datos para obtener id_asistente e id_usuario
-      const thread = await Thread.findOne({ where: { id_thread: threadId } });
-      if (!thread) {
-          return res.status(404).json({ message: 'Hilo no encontrado.' });
+    // Buscar el hilo en la base de datos para obtener id_asistente e id_usuario
+    const thread = await Thread.findOne({ where: { id_thread: threadId } });
+    if (!thread) {
+      return res.status(404).json({ message: 'Hilo no encontrado.' });
+    }
+
+    // Obtener detalles del asistente a partir de la lista de asistentes
+    const assistant = assistants.find(asst => asst.id === thread.id_asistente);
+
+    // Obtener detalles del usuario a partir del modelo Usuario
+    const user = await Usuario.findByPk(thread.id_usuario);
+
+    // Obtener todos los mensajes del hilo desde OpenAI (con paginación)
+    console.log(`Obteniendo mensajes para el hilo: ${threadId}`);
+    let allMessages = [];
+    let afterCursor = null; // Cursor para la paginación
+
+    do {
+      const response = await openai.beta.threads.messages.list(threadId, {
+        after: afterCursor, // Cursor para la siguiente página
+        limit: 100, // Máximo permitido por la API
+        order: 'desc', // Orden ascendente para obtener los mensajes más antiguos primero
+      });
+
+      allMessages = allMessages.concat(response.data); // Agregar mensajes a la lista
+      afterCursor = response.data.length > 0 ? response.data[response.data.length - 1].id : null; // Actualizar el cursor
+    } while (afterCursor); // Continuar mientras haya más páginas
+
+    //   console.log("Todos los mensajes obtenidos desde OpenAI:", JSON.stringify(allMessages, null, 2));
+
+    // Reemplazar el role por el nombre correspondiente (assistant o user)
+    const formattedMessages = allMessages.map((msg) => {
+      let senderName = msg.role; // Valor por defecto
+      if (msg.role === 'assistant') {
+        senderName = assistant?.name || 'Asistente desconocido';
+      } else if (msg.role === 'user') {
+        senderName = user?.nombre || user?.name || 'Usuario desconocido';
       }
 
-      // Obtener detalles del asistente a partir de la lista de asistentes
-      const assistant = assistants.find(asst => asst.id === thread.id_asistente);
+      // Manejar diferentes estructuras de contenido
+      const content = msg.content?.[0]?.text?.value || msg.content?.[0]?.text || msg.content || "";
 
-      // Obtener detalles del usuario a partir del modelo Usuario
-      const user = await Usuario.findByPk(thread.id_usuario);
+      return {
+        sender: senderName,
+        content: content,
+      };
+    });
 
-      // Obtener los mensajes del hilo desde OpenAI
-      console.log(`Obteniendo mensajes para el hilo: ${threadId}`);
-      const messages = await openai.beta.threads.messages.list(threadId);
-
-      // Reemplazar el role por el nombre correspondiente (assistant o user)
-      const formattedMessages = messages.data.map((msg) => {
-          let senderName = msg.role; // Valor por defecto
-          if (msg.role === 'assistant') {
-              senderName = assistant?.name || 'Asistente desconocido';
-          } else if (msg.role === 'user') {
-              senderName = user?.nombre || user?.name || 'Usuario desconocido';
-          }
-          return {
-              sender: senderName,
-              content: msg.content[0]?.text?.value || "",
-          };
-      });
-
-      // Responder con los mensajes, junto a la información del asistente y el usuario
-      res.json({ 
-          assistant: {
-              id: assistant?.id || null,
-              name: assistant?.name || 'Asistente desconocido'
-          },
-          user: {
-              id: user?.id || null,
-              name: user?.nombre || user?.name || 'Usuario desconocido'
-          },
-          messages: formattedMessages 
-      });
+    // Responder con los mensajes, junto a la información del asistente y el usuario
+    res.json({
+      assistant: {
+        id: assistant?.id || null,
+        name: assistant?.name || 'Asistente desconocido'
+      },
+      user: {
+        id: user?.id || null,
+        name: user?.nombre || user?.name || 'Usuario desconocido'
+      },
+      messages: formattedMessages
+    });
   } catch (error) {
-      console.error("Error al obtener los mensajes:", error.message);
-      res.status(500).json({
-          message: "Error al obtener los mensajes del hilo.",
-          detalles: error.message,
-      });
+    console.error("Error al obtener los mensajes:", error.message);
+    res.status(500).json({
+      message: "Error al obtener los mensajes del hilo.",
+      detalles: error.message,
+    });
   }
 };
-
 
 
 
