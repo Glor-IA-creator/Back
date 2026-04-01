@@ -284,6 +284,7 @@ export const obtenerMensajes = async (req, res) => {
             return {
                 sender: senderName,
                 content: content,
+                created_at: msg.created_at,
             };
         });
 
