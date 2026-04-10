@@ -5,14 +5,23 @@ export const validarJWT = (req, res, next) => {
   const token = req.headers['authorization'];
 
   if (!token) {
+    console.warn(`⛔ Auth sin token — ${req.method} ${req.originalUrl} — IP: ${req.ip}`);
     return res.status(401).json({ message: 'No se proporcionó un token, acceso denegado' });
   }
 
   try {
     const decoded = jwt.verify(token.split(' ')[1], process.env.JWT_SECRET);
-    req.usuario = decoded; 
+    req.usuario = decoded;
     next();
   } catch (err) {
+    // Decodificar payload sin verificar para saber quién falló
+    let info = 'desconocido';
+    try {
+      const payload = JSON.parse(Buffer.from(token.split(' ')[1].split('.')[1], 'base64').toString());
+      info = `${payload.nombre || 'sin nombre'} (ID: ${payload.id || '?'})`;
+    } catch (_) { /* token malformado */ }
+
+    console.warn(`⛔ JWT rechazado — ${err.message} — usuario: ${info} — ${req.method} ${req.originalUrl}`);
     return res.status(401).json({ message: 'Token inválido o expirado' });
   }
 };
