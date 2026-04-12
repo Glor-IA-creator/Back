@@ -6,7 +6,7 @@ export const validarJWT = (req, res, next) => {
 
   if (!token) {
     console.warn(`⛔ Auth sin token — ${req.method} ${req.originalUrl} — IP: ${req.ip}`);
-    return res.status(401).json({ message: 'No se proporcionó un token, acceso denegado' });
+    return res.status(401).json({ code: 'AUTH_MISSING', message: 'No se proporcionó un token, acceso denegado' });
   }
 
   try {
@@ -14,15 +14,15 @@ export const validarJWT = (req, res, next) => {
     req.usuario = decoded;
     next();
   } catch (err) {
-    // Decodificar payload sin verificar para saber quién falló
     let info = 'desconocido';
     try {
       const payload = JSON.parse(Buffer.from(token.split(' ')[1].split('.')[1], 'base64').toString());
       info = `${payload.nombre || 'sin nombre'} (ID: ${payload.id || '?'})`;
     } catch (_) { /* token malformado */ }
 
+    const code = err.name === 'TokenExpiredError' ? 'AUTH_EXPIRED' : 'AUTH_INVALID';
     console.warn(`⛔ JWT rechazado — ${err.message} — usuario: ${info} — ${req.method} ${req.originalUrl}`);
-    return res.status(401).json({ message: 'Token inválido o expirado' });
+    return res.status(401).json({ code, message: 'Token inválido o expirado' });
   }
 };
 

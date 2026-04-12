@@ -61,10 +61,13 @@ const esperarRespuestaDeAsistente = async (threadId, runId, res) => {
         }
     } catch (error) {
         console.error("Error en el polling del asistente:", error.message);
-        // Verificamos si la respuesta ya se envió para evitar el error ERR_HTTP_HEADERS_SENT
         if (!res.headersSent) {
-            res.status(500).json({
-                message: "Error interno al verificar el asistente.",
+            const isThreadError = error.status === 401 || error.message?.includes('insufficient permissions');
+            res.status(isThreadError ? 503 : 500).json({
+                code: isThreadError ? 'THREAD_UNAVAILABLE' : 'UPSTREAM_ERROR',
+                message: isThreadError
+                    ? "Este hilo de conversación ya no está disponible. Inicia una nueva sesión."
+                    : "Error interno al verificar el asistente.",
                 detalles: error.message
             });
         }
@@ -191,8 +194,12 @@ export const agregarMensaje = async (req, res) => {
     } catch (error) {
         console.error("Error al agregar el mensaje o ejecutar el asistente:", error.message);
         if (!res.headersSent) {
-             res.status(500).json({
-                message: "Error al agregar el mensaje o ejecutar el asistente.",
+            const isThreadError = error.status === 401 || error.message?.includes('insufficient permissions');
+            res.status(isThreadError ? 503 : 500).json({
+                code: isThreadError ? 'THREAD_UNAVAILABLE' : 'UPSTREAM_ERROR',
+                message: isThreadError
+                    ? "Este hilo de conversación ya no está disponible. Inicia una nueva sesión."
+                    : "Error al procesar el mensaje.",
                 detalles: error.message,
             });
         }
@@ -230,8 +237,12 @@ export const ejecutarAsistente = async (req, res) => {
     } catch (error) {
         console.error("Error al ejecutar el asistente:", error.message);
         if (!res.headersSent) {
-            res.status(500).json({
-                message: "Error al ejecutar el asistente.",
+            const isThreadError = error.status === 401 || error.message?.includes('insufficient permissions');
+            res.status(isThreadError ? 503 : 500).json({
+                code: isThreadError ? 'THREAD_UNAVAILABLE' : 'UPSTREAM_ERROR',
+                message: isThreadError
+                    ? "Este hilo de conversación ya no está disponible. Inicia una nueva sesión."
+                    : "Error al ejecutar el asistente.",
                 detalles: error.message,
             });
         }
@@ -301,8 +312,12 @@ export const obtenerMensajes = async (req, res) => {
         });
     } catch (error) {
         console.error("Error al obtener los mensajes:", error.message);
-        res.status(500).json({
-            message: "Error al obtener los mensajes del hilo.",
+        const isThreadError = error.status === 401 || error.message?.includes('insufficient permissions');
+        res.status(isThreadError ? 503 : 500).json({
+            code: isThreadError ? 'THREAD_UNAVAILABLE' : 'UPSTREAM_ERROR',
+            message: isThreadError
+                ? "Este hilo de conversación ya no está disponible."
+                : "Error al obtener los mensajes del hilo.",
             detalles: error.message,
         });
     }
