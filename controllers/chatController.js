@@ -2,6 +2,7 @@ import { OpenAI } from "openai";
 import dotenv from "dotenv";
 import Thread from '../models/Thread.js';
 import Usuario from '../models/Usuario.js';
+import db from '../database/db.js';
 import { Op, Sequelize } from 'sequelize';
 
 dotenv.config(); // Cargar las variables de entorno
@@ -46,9 +47,18 @@ const esperarRespuestaDeAsistente = async (threadId, runId, res) => {
             console.log(`Estado del asistente (${threadId}): ${estado}`);
 
             if (estado === "completed") {
-                // ¡Listo! Obtenemos mensajes
                 const messagesList = await openai.beta.threads.messages.list(threadId);
                 const messages = messagesList.data.map(msg => msg.content[0]?.text?.value || "");
+
+                // Save assistant response locally
+                if (messages[0]) {
+                    const ts = Math.floor(Date.now() / 1000);
+                    await db.query(
+                        'INSERT INTO messages (id_thread, role, content, created_at) VALUES (?, ?, ?, ?)',
+                        { replacements: [threadId, 'assistant', messages[0], ts] }
+                    ).catch(() => {});
+                }
+
                 return res.json({ messages });
             } else if (estado === "failed" || estado === "cancelled" || estado === "expired") {
                 return res.status(500).json({
@@ -183,12 +193,18 @@ export const agregarMensaje = async (req, res) => {
             content: mensaje,
         });
 
+        // Save user message locally
+        const userTimestamp = Math.floor(Date.now() / 1000);
+        await db.query(
+            'INSERT INTO messages (id_thread, role, content, created_at) VALUES (?, ?, ?, ?)',
+            { replacements: [threadId, 'user', mensaje, userTimestamp] }
+        );
+
         console.log(`Ejecutando asistente (${selectedAssistant.name}) para el hilo: ${threadId}`);
         const run = await openai.beta.threads.runs.create(threadId, {
             assistant_id: selectedAssistantId,
         });
-        
-        // Usamos la nueva función de polling seguro en lugar de setInterval
+
         await esperarRespuestaDeAsistente(threadId, run.id, res);
 
     } catch (error) {
@@ -266,8 +282,32 @@ export const obtenerMensajes = async (req, res) => {
 
         const assistant = assistants.find(asst => asst.id === thread.id_asistente);
         const user = await Usuario.findByPk(thread.id_usuario);
+        const assistantName = assistant?.name || 'Asistente desconocido';
+        const userName = user?.nombre || user?.name || 'Usuario desconocido';
 
-        console.log(`Obteniendo mensajes para el hilo: ${threadId}`);
+        // Try local DB first
+        const [localMsgs] = await db.query(
+            'SELECT role, content, created_at FROM messages WHERE id_thread = ? ORDER BY created_at ASC',
+            { replacements: [threadId] }
+        );
+
+        if (localMsgs.length > 0) {
+            console.log(`Mensajes locales para ${threadId}: ${localMsgs.length}`);
+            const formattedMessages = localMsgs.map((msg) => ({
+                sender: msg.role === 'assistant' ? assistantName : userName,
+                content: msg.content,
+                created_at: msg.created_at,
+            }));
+
+            return res.json({
+                assistant: { id: assistant?.id || null, name: assistantName },
+                user: { id: user?.id || null, name: userName },
+                messages: formattedMessages
+            });
+        }
+
+        // Fallback to OpenAI
+        console.log(`Obteniendo mensajes de OpenAI para el hilo: ${threadId}`);
         let allMessages = [];
         let afterCursor = null;
 
@@ -282,32 +322,15 @@ export const obtenerMensajes = async (req, res) => {
             afterCursor = response.data.length > 0 ? response.data[response.data.length - 1].id : null;
         } while (afterCursor);
 
-        const formattedMessages = allMessages.map((msg) => {
-            let senderName = msg.role;
-            if (msg.role === 'assistant') {
-                senderName = assistant?.name || 'Asistente desconocido';
-            } else if (msg.role === 'user') {
-                senderName = user?.nombre || user?.name || 'Usuario desconocido';
-            }
-
-            const content = msg.content?.[0]?.text?.value || msg.content?.[0]?.text || msg.content || "";
-
-            return {
-                sender: senderName,
-                content: content,
-                created_at: msg.created_at,
-            };
-        });
+        const formattedMessages = allMessages.map((msg) => ({
+            sender: msg.role === 'assistant' ? assistantName : userName,
+            content: msg.content?.[0]?.text?.value || msg.content?.[0]?.text || msg.content || "",
+            created_at: msg.created_at,
+        }));
 
         res.json({
-            assistant: {
-                id: assistant?.id || null,
-                name: assistant?.name || 'Asistente desconocido'
-            },
-            user: {
-                id: user?.id || null,
-                name: user?.nombre || user?.name || 'Usuario desconocido'
-            },
+            assistant: { id: assistant?.id || null, name: assistantName },
+            user: { id: user?.id || null, name: userName },
             messages: formattedMessages
         });
     } catch (error) {
