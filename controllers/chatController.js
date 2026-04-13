@@ -1,4 +1,5 @@
 import { OpenAI } from "openai";
+import crypto from "crypto";
 import dotenv from "dotenv";
 import Thread from '../models/Thread.js';
 import Usuario from '../models/Usuario.js';
@@ -7,10 +8,13 @@ import { Op, Sequelize } from 'sequelize';
 
 dotenv.config(); // Cargar las variables de entorno
 
+const reqId = () => crypto.randomUUID().slice(0, 8);
+
 // Configuración de OpenAI API
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
     defaultHeaders: { "OpenAI-Beta": "assistants=v2" },
+    timeout: 15_000,
 });
 
 // Lista de asistentes disponibles
@@ -28,7 +32,9 @@ const DEFAULT_ASSISTANT_ID = process.env.ASSISTANT_ID || assistants[0].id;
 
 // --- FUNCIÓN AUXILIAR PARA POLLING SEGURO ---
 // Esta función reemplaza al setInterval problemático
-const esperarRespuestaDeAsistente = async (threadId, runId, res) => {
+const esperarRespuestaDeAsistente = async (threadId, runId, res, rid) => {
+    const start = Date.now();
+    console.log(`[${rid}] polling:start thread=${threadId} run=${runId}`);
     try {
         let estado = "queued";
         let intentos = 0;
@@ -36,7 +42,9 @@ const esperarRespuestaDeAsistente = async (threadId, runId, res) => {
 
         while (estado !== "completed") {
             if (intentos >= maxIntentos) {
-                return res.status(504).json({ message: "El asistente tardó demasiado en responder." });
+                const dur = ((Date.now() - start) / 1000).toFixed(1);
+                console.warn(`[${rid}] polling:timeout thread=${threadId} intentos=${intentos} dur=${dur}s`);
+                return res.status(504).json({ requestId: rid, message: "El asistente tardó demasiado en responder." });
             }
 
             // Esperar 2 segundos antes de volver a preguntar (Polling secuencial)
@@ -44,7 +52,7 @@ const esperarRespuestaDeAsistente = async (threadId, runId, res) => {
 
             const runObject = await openai.beta.threads.runs.retrieve(threadId, runId);
             estado = runObject.status;
-            console.log(`Estado del asistente (${threadId}): ${estado}`);
+            console.log(`[${rid}] polling:status thread=${threadId} status=${estado} intento=${intentos}`);
 
             if (estado === "completed") {
                 const messagesList = await openai.beta.threads.messages.list(threadId);
@@ -59,9 +67,14 @@ const esperarRespuestaDeAsistente = async (threadId, runId, res) => {
                     ).catch(() => {});
                 }
 
+                const dur = ((Date.now() - start) / 1000).toFixed(1);
+                console.log(`[${rid}] polling:done thread=${threadId} dur=${dur}s intentos=${intentos}`);
                 return res.json({ messages });
             } else if (estado === "failed" || estado === "cancelled" || estado === "expired") {
+                const dur = ((Date.now() - start) / 1000).toFixed(1);
+                console.error(`[${rid}] polling:failed thread=${threadId} status=${estado} dur=${dur}s`);
                 return res.status(500).json({
+                    requestId: rid,
                     message: "El asistente falló al procesar la respuesta.",
                     detalles: runObject.last_error || "Error desconocido"
                 });
@@ -70,16 +83,31 @@ const esperarRespuestaDeAsistente = async (threadId, runId, res) => {
             intentos++;
         }
     } catch (error) {
-        console.error("Error en el polling del asistente:", error.message);
+        const dur = ((Date.now() - start) / 1000).toFixed(1);
+        const isTimeout = error.code === 'ETIMEDOUT' || error.message?.includes('timed out') || error.message?.includes('timeout');
+        const isThreadError = error.status === 401 || error.message?.includes('insufficient permissions');
+        console.error(`[${rid}] polling:error thread=${threadId} dur=${dur}s timeout=${isTimeout} err=${error.message}`);
         if (!res.headersSent) {
-            const isThreadError = error.status === 401 || error.message?.includes('insufficient permissions');
-            res.status(isThreadError ? 503 : 500).json({
-                code: isThreadError ? 'THREAD_UNAVAILABLE' : 'UPSTREAM_ERROR',
-                message: isThreadError
-                    ? "Este hilo de conversación ya no está disponible. Inicia una nueva sesión."
-                    : "Error interno al verificar el asistente.",
-                detalles: error.message
-            });
+            if (isTimeout) {
+                res.status(504).json({
+                    requestId: rid,
+                    code: 'OPENAI_TIMEOUT',
+                    message: "El asistente no respondió a tiempo. Intenta nuevamente.",
+                });
+            } else if (isThreadError) {
+                res.status(503).json({
+                    requestId: rid,
+                    code: 'THREAD_UNAVAILABLE',
+                    message: "Este hilo de conversación ya no está disponible. Inicia una nueva sesión.",
+                });
+            } else {
+                res.status(500).json({
+                    requestId: rid,
+                    code: 'UPSTREAM_ERROR',
+                    message: "Error interno al verificar el asistente.",
+                    detalles: error.message,
+                });
+            }
         }
     }
 };
@@ -169,6 +197,7 @@ export const obtenerHistorialDeHilos = async (req, res) => {
 
 // Agregar un mensaje al hilo y ejecutar un asistente (CORREGIDO)
 export const agregarMensaje = async (req, res) => {
+    const rid = reqId();
     const { threadId, mensaje, assistantId } = req.body;
 
     if (!threadId || !mensaje) {
@@ -179,7 +208,7 @@ export const agregarMensaje = async (req, res) => {
 
     const selectedAssistantId = assistantId || DEFAULT_ASSISTANT_ID;
     const selectedAssistant = assistants.find(asst => asst.id === selectedAssistantId);
-    
+
     if (!selectedAssistant) {
         return res.status(404).json({
             message: "El asistente seleccionado no existe.",
@@ -187,7 +216,7 @@ export const agregarMensaje = async (req, res) => {
     }
 
     try {
-        console.log(`Agregando mensaje al hilo: ${threadId}`);
+        console.log(`[${rid}] agregarMensaje:start thread=${threadId} assistant=${selectedAssistant.name}`);
         await openai.beta.threads.messages.create(threadId, {
             role: "user",
             content: mensaje,
@@ -200,30 +229,45 @@ export const agregarMensaje = async (req, res) => {
             { replacements: [threadId, 'user', mensaje, userTimestamp] }
         );
 
-        console.log(`Ejecutando asistente (${selectedAssistant.name}) para el hilo: ${threadId}`);
+        console.log(`[${rid}] agregarMensaje:run thread=${threadId} assistant=${selectedAssistant.name}`);
         const run = await openai.beta.threads.runs.create(threadId, {
             assistant_id: selectedAssistantId,
         });
 
-        await esperarRespuestaDeAsistente(threadId, run.id, res);
+        await esperarRespuestaDeAsistente(threadId, run.id, res, rid);
 
     } catch (error) {
-        console.error("Error al agregar el mensaje o ejecutar el asistente:", error.message);
+        const isTimeout = error.code === 'ETIMEDOUT' || error.message?.includes('timed out') || error.message?.includes('timeout');
+        const isThreadError = error.status === 401 || error.message?.includes('insufficient permissions');
+        console.error(`[${rid}] agregarMensaje:error thread=${threadId} timeout=${isTimeout} err=${error.message}`);
         if (!res.headersSent) {
-            const isThreadError = error.status === 401 || error.message?.includes('insufficient permissions');
-            res.status(isThreadError ? 503 : 500).json({
-                code: isThreadError ? 'THREAD_UNAVAILABLE' : 'UPSTREAM_ERROR',
-                message: isThreadError
-                    ? "Este hilo de conversación ya no está disponible. Inicia una nueva sesión."
-                    : "Error al procesar el mensaje.",
-                detalles: error.message,
-            });
+            if (isTimeout) {
+                res.status(504).json({
+                    requestId: rid,
+                    code: 'OPENAI_TIMEOUT',
+                    message: "El asistente no respondió a tiempo. Intenta nuevamente.",
+                });
+            } else if (isThreadError) {
+                res.status(503).json({
+                    requestId: rid,
+                    code: 'THREAD_UNAVAILABLE',
+                    message: "Este hilo de conversación ya no está disponible. Inicia una nueva sesión.",
+                });
+            } else {
+                res.status(500).json({
+                    requestId: rid,
+                    code: 'UPSTREAM_ERROR',
+                    message: "Error al procesar el mensaje.",
+                    detalles: error.message,
+                });
+            }
         }
     }
 };
 
 // Ejecutar un asistente en un hilo (CORREGIDO)
 export const ejecutarAsistente = async (req, res) => {
+    const rid = reqId();
     const { threadId, assistantId } = req.body;
 
     if (!threadId) {
@@ -234,7 +278,7 @@ export const ejecutarAsistente = async (req, res) => {
 
     const selectedAssistantId = assistantId || DEFAULT_ASSISTANT_ID;
     const selectedAssistant = assistants.find(asst => asst.id === selectedAssistantId);
-    
+
     if (!selectedAssistant) {
         return res.status(404).json({
             message: "El asistente seleccionado no existe.",
@@ -242,30 +286,45 @@ export const ejecutarAsistente = async (req, res) => {
     }
 
     try {
-        console.log(`Ejecutando asistente (${selectedAssistant.name}) para el hilo: ${threadId}`);
+        console.log(`[${rid}] ejecutarAsistente:start thread=${threadId} assistant=${selectedAssistant.name}`);
         const run = await openai.beta.threads.runs.create(threadId, {
             assistant_id: selectedAssistantId,
         });
 
-        // Usamos la nueva función de polling seguro
-        await esperarRespuestaDeAsistente(threadId, run.id, res);
+        await esperarRespuestaDeAsistente(threadId, run.id, res, rid);
 
     } catch (error) {
-        console.error("Error al ejecutar el asistente:", error.message);
+        const isTimeout = error.code === 'ETIMEDOUT' || error.message?.includes('timed out') || error.message?.includes('timeout');
+        const isThreadError = error.status === 401 || error.message?.includes('insufficient permissions');
+        console.error(`[${rid}] ejecutarAsistente:error thread=${threadId} timeout=${isTimeout} err=${error.message}`);
         if (!res.headersSent) {
-            const isThreadError = error.status === 401 || error.message?.includes('insufficient permissions');
-            res.status(isThreadError ? 503 : 500).json({
-                code: isThreadError ? 'THREAD_UNAVAILABLE' : 'UPSTREAM_ERROR',
-                message: isThreadError
-                    ? "Este hilo de conversación ya no está disponible. Inicia una nueva sesión."
-                    : "Error al ejecutar el asistente.",
-                detalles: error.message,
-            });
+            if (isTimeout) {
+                res.status(504).json({
+                    requestId: rid,
+                    code: 'OPENAI_TIMEOUT',
+                    message: "El asistente no respondió a tiempo. Intenta nuevamente.",
+                });
+            } else if (isThreadError) {
+                res.status(503).json({
+                    requestId: rid,
+                    code: 'THREAD_UNAVAILABLE',
+                    message: "Este hilo de conversación ya no está disponible. Inicia una nueva sesión.",
+                });
+            } else {
+                res.status(500).json({
+                    requestId: rid,
+                    code: 'UPSTREAM_ERROR',
+                    message: "Error al ejecutar el asistente.",
+                    detalles: error.message,
+                });
+            }
         }
     }
 };
 
 export const obtenerMensajes = async (req, res) => {
+    const rid = reqId();
+    const start = Date.now();
     const { threadId } = req.query;
 
     if (!threadId) {
@@ -274,10 +333,12 @@ export const obtenerMensajes = async (req, res) => {
         });
     }
 
+    console.log(`[${rid}] obtenerMensajes:start thread=${threadId}`);
+
     try {
         const thread = await Thread.findOne({ where: { id_thread: threadId } });
         if (!thread) {
-            return res.status(404).json({ message: 'Hilo no encontrado.' });
+            return res.status(404).json({ requestId: rid, message: 'Hilo no encontrado.' });
         }
 
         const assistant = assistants.find(asst => asst.id === thread.id_asistente);
@@ -292,7 +353,8 @@ export const obtenerMensajes = async (req, res) => {
         );
 
         if (localMsgs.length > 0) {
-            console.log(`Mensajes locales para ${threadId}: ${localMsgs.length}`);
+            const dur = ((Date.now() - start) / 1000).toFixed(1);
+            console.log(`[${rid}] obtenerMensajes:local thread=${threadId} msgs=${localMsgs.length} dur=${dur}s`);
             const formattedMessages = localMsgs.map((msg) => ({
                 sender: msg.role === 'assistant' ? assistantName : userName,
                 content: msg.content,
@@ -307,11 +369,19 @@ export const obtenerMensajes = async (req, res) => {
         }
 
         // Fallback to OpenAI
-        console.log(`Obteniendo mensajes de OpenAI para el hilo: ${threadId}`);
+        console.log(`[${rid}] obtenerMensajes:openai-fallback thread=${threadId}`);
         let allMessages = [];
         let afterCursor = null;
+        const MAX_PAGES = 10;
+        let page = 0;
+        let truncated = false;
 
         do {
+            if (page >= MAX_PAGES) {
+                truncated = true;
+                console.warn(`[${rid}] obtenerMensajes:pagination-limit thread=${threadId} pages=${page} msgs=${allMessages.length} TRUNCATED`);
+                break;
+            }
             const response = await openai.beta.threads.messages.list(threadId, {
                 after: afterCursor,
                 limit: 100,
@@ -320,7 +390,11 @@ export const obtenerMensajes = async (req, res) => {
 
             allMessages = allMessages.concat(response.data);
             afterCursor = response.data.length > 0 ? response.data[response.data.length - 1].id : null;
+            page++;
         } while (afterCursor);
+
+        const dur = ((Date.now() - start) / 1000).toFixed(1);
+        console.log(`[${rid}] obtenerMensajes:done thread=${threadId} source=openai msgs=${allMessages.length} pages=${page} truncated=${truncated} dur=${dur}s`);
 
         const formattedMessages = allMessages.map((msg) => ({
             sender: msg.role === 'assistant' ? assistantName : userName,
@@ -334,15 +408,30 @@ export const obtenerMensajes = async (req, res) => {
             messages: formattedMessages
         });
     } catch (error) {
-        console.error("Error al obtener los mensajes:", error.message);
+        const dur = ((Date.now() - start) / 1000).toFixed(1);
+        const isTimeout = error.code === 'ETIMEDOUT' || error.message?.includes('timed out') || error.message?.includes('timeout');
         const isThreadError = error.status === 401 || error.message?.includes('insufficient permissions');
-        res.status(isThreadError ? 503 : 500).json({
-            code: isThreadError ? 'THREAD_UNAVAILABLE' : 'UPSTREAM_ERROR',
-            message: isThreadError
-                ? "Este hilo de conversación ya no está disponible."
-                : "Error al obtener los mensajes del hilo.",
-            detalles: error.message,
-        });
+        console.error(`[${rid}] obtenerMensajes:error thread=${threadId} dur=${dur}s timeout=${isTimeout} err=${error.message}`);
+        if (isTimeout) {
+            res.status(504).json({
+                requestId: rid,
+                code: 'OPENAI_TIMEOUT',
+                message: "No se pudieron obtener los mensajes a tiempo. Intenta nuevamente.",
+            });
+        } else if (isThreadError) {
+            res.status(503).json({
+                requestId: rid,
+                code: 'THREAD_UNAVAILABLE',
+                message: "Este hilo de conversación ya no está disponible.",
+            });
+        } else {
+            res.status(500).json({
+                requestId: rid,
+                code: 'UPSTREAM_ERROR',
+                message: "Error al obtener los mensajes del hilo.",
+                detalles: error.message,
+            });
+        }
     }
 };
 
