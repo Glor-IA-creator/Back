@@ -16,6 +16,19 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Health check (público, sin auth)
+app.get('/health', async (req, res) => {
+  const status = { server: 'ok', timestamp: new Date().toISOString() };
+  try {
+    await db.authenticate();
+    status.database = 'ok';
+  } catch {
+    status.database = 'error';
+  }
+  const httpCode = status.database === 'ok' ? 200 : 503;
+  res.status(httpCode).json(status);
+});
+
 // Registrar rutas protegidas
 app.use('/api/secciones', validarJWT, seccionRoutes);
 app.use('/api/estudiantes', validarJWT, estudiantesRoutes);
